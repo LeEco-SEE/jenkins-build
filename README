@@ -9,6 +9,7 @@ pip install ./dist/jenkins-build-1.0.0.tar.gz
 jenkins-build --help
 
 # How to build and upload to PyPI
+python setup.py register 
 python setup.py sdist upload
 
 # How to install from PyPI

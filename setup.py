@@ -7,7 +7,7 @@ setup(name='jenkins-build',
       keywords='jenkins build trigger cancel stop query log queue_id build_number',
       classifiers=[
         'Development Status :: 3 - Alpha',
-        'License :: OSI Approved :: Apache Software License, Version 2.0',
+        'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 2.7',
         'Topic :: Software Development :: Build Tools',
       ],
