@@ -12,6 +12,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('jenkins-build')
 
+# read the configure file to get jenkins settings
 def read_jenkins_conf(cli):
     confs={}
     if cli.conf is not None and os.path.isfile(cli.conf):
@@ -28,6 +29,7 @@ def read_jenkins_conf(cli):
                 confs['password'] = parser.get(section_name, 'password')
     return confs
 
+# merge the jenkins settings with command line options
 def merge_jenkins_conf(cli):
     jcs = {}
     confs = read_jenkins_conf(cli)
@@ -58,6 +60,7 @@ def merge_jenkins_conf(cli):
 
     return jcs
 
+# read the configure file to get the build settings
 def read_build_conf(cli):
     jobname=None
     parameters={}
@@ -76,6 +79,7 @@ def read_build_conf(cli):
                 parameters[name] = value
     return (jobname, parameters)
 
+# merge the build settings with command line options
 def merge_build_conf(cli):
     jobname = None
     parameters = {}
@@ -97,6 +101,7 @@ def merge_build_conf(cli):
 
     return (jobname, parameters)
 
+# get the query settings from command line
 def get_query_conf(cli):
     jobname = None
     buildnum=None
@@ -123,6 +128,7 @@ def get_query_conf(cli):
     return (jobname, buildnum, queueid)
 
 
+# get the cancel settings from command line
 def get_cancel_conf(cli):
     jobname = None
     buildnum=None
@@ -148,7 +154,7 @@ def get_cancel_conf(cli):
 
     return (jobname, buildnum, queueid)
 
-
+# get the log settings from command line
 def get_buildlog_conf(cli):
     jobname = None
     buildnum = None
@@ -176,10 +182,7 @@ def get_buildlog_conf(cli):
     return (jobname, buildnum, queueid, logfile)
 
 
-def jenkins_login(jenkins_url, jenkins_user, jenkins_password):
-    server = jenkins.Jenkins(jenkins_url, jenkins_user, jenkins_password)
-    return server
-
+# check whether job is buildable
 def is_job_buildable(server,jobname):
     if server.job_exists(jobname) != True :
         logger.error("job {} doesn't exist!".format(jobname))
@@ -187,6 +190,7 @@ def is_job_buildable(server,jobname):
     building = server.get_job_info(jobname)['buildable']
     return building
 
+# get all history build numbers
 def get_all_build_number(server,jobname):
     numbers = []
     if server.job_exists(jobname) != True :
@@ -294,6 +298,7 @@ def check_build_status_buildnum(server,jobname,buildnum):
         status = build['result']
     return status
 
+# stop a running build with build number
 def stop_running_build(server,jobname,buildnum):
     logger.info("stop running build,{},{}".format(jobname,buildnum))
     server.stop_build(jobname,buildnum)
@@ -353,6 +358,7 @@ def cancel_build_with_queueid(server,jobname,queueid):
         status = cancel_running_build_queueid(server,jobname,queueid)
     return status
 
+# action for sub command 'build'
 def build(cli,jcs):
     server = jenkins.Jenkins(jcs['jenkins'], jcs['user'], jcs['password'])
     (job,parameters) = merge_build_conf(cli)
@@ -368,6 +374,7 @@ def build(cli,jcs):
         logger.info("failed to trigger a build")
     
 
+# action for sub command 'query'
 def query(cli, jcs):
     logger.info("query a build")
     server = jenkins.Jenkins(jcs['jenkins'], jcs['user'], jcs['password'])
@@ -382,6 +389,7 @@ def query(cli, jcs):
     logger.info("build_status={} ".format(status))
 
 
+# # action for sub command 'cancel'
 def cancel(cli, jcs):
     logger.info("cancel a build")
     server = jenkins.Jenkins(jcs['jenkins'], jcs['user'], jcs['password'])
@@ -398,6 +406,7 @@ def cancel(cli, jcs):
         status = cancel_build_with_queueid(server,jobname,queueid) 
         logger.info("build_status={}".format(status))
 
+## action for sub command 'log'
 def buildlog(cli,jcs):
     logger.info("fetch a build log")
     server = jenkins.Jenkins(jcs['jenkins'], jcs['user'], jcs['password'])
@@ -420,6 +429,7 @@ def buildlog(cli,jcs):
             log.write(slog)
     
 
+# parse the command line options
 def create_parser():
     parser = argparse.ArgumentParser(conflict_handler='resolve')
     parser.add_argument(
@@ -470,14 +480,13 @@ def create_parser():
 
     return parser
 
-    
+# the main entry point
 def main():
     parser = create_parser()
     cli= parser.parse_args()
     logger.debug(cli)
     confs = merge_jenkins_conf(cli)
     logger.debug(confs)
- 
     cli.func(cli,confs)
     sys.exit(0)
 

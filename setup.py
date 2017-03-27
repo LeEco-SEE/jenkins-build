@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='jenkins-build',
-      version='1.0.0',
+      version=open('version').read().strip(),
       description='A python tool to manage(trigger/query/cancel/stop/log) jenkins build',
       long_description='support to trigger a jenkins build with/without parameters in configure file, query a build status with queueid or build number, cancel a build with queueid or build number, get the build log with queueid or build number with option to save the log output to a log file ',
       keywords='jenkins build trigger cancel stop query log queue_id build_number',
