@@ -5,7 +5,7 @@ A python pip package to trigger/query/cancel/stop/log a jenkins build
 python setup.py sdist
 
 # How to test local package
-pip install ./dist/jenkins-build-1.0.0.tar.gz
+pip install ./dist/jenkins-build-x.y.z.tar.gz --upgrade
 jenkins-build --help
 
 # How to build and upload to PyPI

@@ -8,6 +8,7 @@ import subprocess
 import argparse
 from ConfigParser import SafeConfigParser
 import logging
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('jenkins-build')
@@ -250,7 +251,7 @@ def check_build_in_queue(server,queueid):
             logger.info("job_url={}".format(task['task']['url']))
             return True
     if found is False:
-        logger.info("not find queueid {} in queue".format(queueid))
+        logger.warning("not find queueid {} in queue".format(queueid))
         return False
 
 #check history build status with queueid
@@ -302,7 +303,8 @@ def check_build_status_buildnum(server,jobname,buildnum):
 def stop_running_build(server,jobname,buildnum):
     logger.info("stop running build,{},{}".format(jobname,buildnum))
     server.stop_build(jobname,buildnum)
-    logger.info("check the build status again")
+    logger.info("wait some time and check the build status again")
+    time.sleep(3)
     status = check_build_status_buildnum(server,jobname,buildnum)
     if status == "ABORTED":
         logger.info("succeed to stop running build")
@@ -328,7 +330,7 @@ def cancel_running_build_queueid(server,jobname,queueid):
             logger.info("queueid {} build is building".format(queueid))
             status = stop_running_build(server,jobname,buildnum)
         else:
-            logger.info("queueid {} build was completed".format(queueid))
+            logger.warning("queueid {} build was completed".format(queueid))
             status = build['result']
             buildnum = build['number']
             buildurl = build['url']
@@ -341,20 +343,21 @@ def cancel_running_build_queueid(server,jobname,queueid):
 
 #cancel build with queueid
 def cancel_build_with_queueid(server,jobname,queueid):
-    logger.info("cancel queueid {} build in queue".format(queueid))
+    logger.info("cancel build with queueid {}".format(queueid))
     status = None
     if check_build_in_queue(server,queueid):
         logger.info("cancel the queueid {} build".format(queueid))
         server.cancel_queue(int(queueid))
-        logger.info("check the queueid {} in queue again".format(queueid))
+        logger.info("wait some time and check the queueid {} in queue again".format(queueid))
+        time.sleep(3)
         if check_build_in_queue(server,queueid):
             logger.info("failed to cancel queued build")
             status = "QUEUED"
         else:
             logger.info("succeed to cancel queued build")
-            status="CANCELED"
+            status="CANCELLED"
     else:
-        logger.warning("not found queueid {} in queue".format(queueid))
+        logger.info("cancel running build with queueid {}".format(queueid))
         status = cancel_running_build_queueid(server,jobname,queueid)
     return status
 
@@ -371,7 +374,8 @@ def build(cli,jcs):
         logger.info("succeed to trigger a build")
         logger.info("queue_id={}".format(queueid))
     else:
-        logger.info("failed to trigger a build")
+        logger.error("failed to trigger a build")
+        sys.exit(1)
     
 
 # action for sub command 'query'
@@ -379,14 +383,19 @@ def query(cli, jcs):
     logger.info("query a build")
     server = jenkins.Jenkins(jcs['jenkins'], jcs['user'], jcs['password'])
     (jobname, buildnum, queueid) = get_query_conf(cli)
-    if jobname is not None and buildnum is not None:
+    if  buildnum is not None:
         status = check_build_status_buildnum(server,jobname,buildnum)
     elif queueid is not None:
         if check_build_in_queue(server,queueid) is True:
             status = "QUEUED"
         else:
             status = check_build_status_queueid(server,jobname,queueid)
-    logger.info("build_status={} ".format(status))
+    if status is None:
+        logger.warning("failed to determine build status")
+        logger.info("build_status={} ".format(status))
+        sys.exit(1)
+    else:
+        logger.info("build_status={} ".format(status))
 
 
 # # action for sub command 'cancel'
@@ -394,17 +403,33 @@ def cancel(cli, jcs):
     logger.info("cancel a build")
     server = jenkins.Jenkins(jcs['jenkins'], jcs['user'], jcs['password'])
     (jobname, buildnum, queueid) = get_cancel_conf(cli)
-    if jobname is not None and buildnum is not None:
+    if buildnum is not None:
         status = check_build_status_buildnum(server,jobname,buildnum)
-        if status == "BUILDING":
+        if status is None:
+            logger.warning("failed to determine build status")
+            logger.info("build_status={} ".format(status))
+            sys.exit(1)
+        elif status == "BUILDING":
             status = stop_running_build(server,jobname,buildnum)
             logger.info("build_status={}".format(status))
-        else:
-            logger.info("build is not building")
+        elif status == "ABORTED":
+            logger.info("build was aborted")
             logger.info("build_status={}".format(status))
+        else:
+            logger.info("build was completed")
+            logger.info("build_status={}".format(status))
+            sys.exit(1)
     elif queueid is not None:
-        status = cancel_build_with_queueid(server,jobname,queueid) 
-        logger.info("build_status={}".format(status))
+        status = cancel_build_with_queueid(server,jobname,queueid)
+        if status is None:
+            logger.warning("failed to determine build status")
+            logger.info("build_status={}".format(status))
+            sys.exit(1)
+        elif status == "CANCELLED" or status == "ABORTED" :
+            logger.info("build_status={}".format(status))
+        else: 
+            logger.info("build_status={}".format(status))
+            sys.exit(1)
 
 ## action for sub command 'log'
 def buildlog(cli,jcs):
@@ -417,7 +442,16 @@ def buildlog(cli,jcs):
             logger.info("get the build num with queueid {}".format(queueid))
             buildnum = get_buildnum_with_queueid(server,jobname,queueid)
             if buildnum is None:
-                logger.info("not find the build num with queueid {}".format(queueid))
+                logger.warning("not find the build num with queueid {}".format(queueid))
+                logger.info("build_status=None")
+                sys.exit(1)
+
+    numbers = get_all_build_number(server,jobname)
+    if int(buildnum)  not in numbers:
+        logger.warning("not found buildnum {} in history builds".format(buildnum))
+        logger.info("build_status=None")
+        sys.exit(1)
+
     slog = server.get_build_console_output(jobname,buildnum)
     logger.info("job_name={}".format(jobname))
     logger.info("build_num={}".format(buildnum))
